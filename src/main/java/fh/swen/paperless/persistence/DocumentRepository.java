@@ -13,4 +13,6 @@ public interface DocumentRepository extends JpaRepository<Document, Long> {
     List<Document> findAllByTitleContainingIgnoreCase(String title);
 
     List<Document> findAllByOwnerIdAndTitleContainingIgnoreCase(Long ownerId, String title);
+
+    List<Document> findAllByTagsId(Long tagId);
 }
