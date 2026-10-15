@@ -1,0 +1,17 @@
+name: Aufgabe
+description: Neues Ticket
+body:
+  - type: textarea
+    id: beschreibung
+    attributes:
+      label: Beschreibung
+      description: Was soll gemacht werden?
+    validations:
+      required: true
+  - type: textarea
+    id: fertig
+    attributes:
+      label: Wann ist das Ticket fertig?
+      value: |
+        - [ ] 
+        - [ ] Tests geschrieben, `./mvnw test` läuft durch
