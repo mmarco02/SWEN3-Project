@@ -17,6 +17,7 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordHasher passwordHasher;
 
     public List<User> fetchAll() {
         return userRepository.findAll();
@@ -39,7 +40,7 @@ public class UserService {
         }
         User user = User.builder()
                 .username(username)
-                .passwordHash(PasswordHasher.hash(password))
+                .passwordHash(passwordHasher.hash(password))
                 .build();
         return userRepository.save(user);
     }
@@ -48,7 +49,7 @@ public class UserService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(InvalidCredentialsException::new);
 
-        if (!PasswordHasher.verify(password, user.getPasswordHash())) {
+        if (!passwordHasher.verify(password, user.getPasswordHash())) {
             throw new InvalidCredentialsException();
         }
         return user;

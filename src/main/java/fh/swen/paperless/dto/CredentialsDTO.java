@@ -18,6 +18,6 @@ public class CredentialsDTO {
     private String username;
 
     @NotBlank
-    @Size(min = 8, max = 128)
+    @Size(min = 8, max = 72) // BCrypt only accepts up to 72 bytes
     private String password;
 }
