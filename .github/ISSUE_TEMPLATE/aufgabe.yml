@@ -1,17 +1,60 @@
 name: Aufgabe
-description: Neues Ticket
+description: Neues Ticket für das Paperless-Projekt
 body:
+  - type: dropdown
+    id: sprint
+    attributes:
+      label: Sprint
+      options:
+        - Sprint 1 – Setup, REST, DAL
+        - Sprint 2 – Web-UI
+        - Sprint 3 – Queues (RabbitMQ)
+        - Sprint 4 – Worker, MinIO, OCR, Elasticsearch
+        - Sprint 5 – GenAI
+        - Sprint 6 – Integrationstest, Batch
+    validations:
+      required: true
+
+  - type: dropdown
+    id: bereich
+    attributes:
+      label: Bereich
+      description: Welche Komponente betrifft das Ticket?
+      options:
+        - REST-Server (Backend)
+        - Web-UI (Frontend)
+        - Worker (OCR / GenAI / Batch)
+        - Datenbank / Entities
+        - Docker / Infrastruktur
+        - Tests
+        - Dokumentation
+    validations:
+      required: true
+
   - type: textarea
     id: beschreibung
     attributes:
       label: Beschreibung
-      description: Was soll gemacht werden?
+      description: Was soll umgesetzt werden und warum?
+      placeholder: z. B. Tags sollen Dokumenten zugewiesen werden können, damit man sie besser filtern kann.
     validations:
       required: true
+
   - type: textarea
-    id: fertig
+    id: akzeptanz
     attributes:
-      label: Wann ist das Ticket fertig?
+      label: Akzeptanzkriterien
+      description: Wann ist das Ticket fertig? Ergänze die konkreten Punkte oben.
       value: |
         - [ ] 
-        - [ ] Tests geschrieben, `./mvnw test` läuft durch
+        - [ ] Unit-Tests geschrieben, `./mvnw test` läuft durch
+        - [ ] `docker compose up --build` startet ohne Fehler
+        - [ ] README aktualisiert (falls neue Endpunkte oder Setup-Schritte)
+    validations:
+      required: true
+
+  - type: textarea
+    id: hinweise
+    attributes:
+      label: Hinweise (optional)
+      description: Links, betroffene Klassen, offene Fragen …
