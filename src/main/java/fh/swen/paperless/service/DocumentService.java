@@ -16,6 +16,7 @@ public class DocumentService {
 
     private final DocumentRepository documentRepository;
     private final UserService userService;
+    private final TagService tagService;
 
     public List<Document> fetchAll() {
         return documentRepository.findAll();
@@ -65,5 +66,24 @@ public class DocumentService {
     @Transactional
     public void delete(Long id) {
         documentRepository.delete(fetchById(id));
+    }
+
+    public List<Document> fetchByTag(Long tagId) {
+        tagService.fetchById(tagId);
+        return documentRepository.findAllByTagsId(tagId);
+    }
+
+    @Transactional
+    public Document addTag(Long id, Long tagId) {
+        Document document = fetchById(id);
+        document.getTags().add(tagService.fetchById(tagId));
+        return documentRepository.saveAndFlush(document);
+    }
+
+    @Transactional
+    public Document removeTag(Long id, Long tagId) {
+        Document document = fetchById(id);
+        document.getTags().remove(tagService.fetchById(tagId));
+        return documentRepository.saveAndFlush(document);
     }
 }

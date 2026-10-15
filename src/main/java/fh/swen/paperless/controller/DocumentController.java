@@ -63,4 +63,14 @@ class DocumentController {
         documentService.delete(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/{id}/tags/{tagId}")
+    public ResponseEntity<DocumentDTO> addTag(@PathVariable Long id, @PathVariable Long tagId) {
+        return ResponseEntity.ok(documentMapper.mapToTarget(documentService.addTag(id, tagId)));
+    }
+
+    @DeleteMapping("/{id}/tags/{tagId}")
+    public ResponseEntity<DocumentDTO> removeTag(@PathVariable Long id, @PathVariable Long tagId) {
+        return ResponseEntity.ok(documentMapper.mapToTarget(documentService.removeTag(id, tagId)));
+    }
 }

@@ -1,6 +1,7 @@
 package fh.swen.paperless.mapper;
 
 import fh.swen.paperless.domain.Document;
+import fh.swen.paperless.domain.Tag;
 import fh.swen.paperless.dto.DocumentDTO;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ public class DocumentMapper implements Mapper<Document, DocumentDTO> {
                 .title(source.getTitle())
                 .ownerId(source.getOwner().getId())
                 .ownerUsername(source.getOwner().getUsername())
+                .tags(source.getTags().stream().map(Tag::getName).sorted().toList())
                 .createdAt(source.getCreatedAt())
                 .updatedAt(source.getUpdatedAt())
                 .build();
