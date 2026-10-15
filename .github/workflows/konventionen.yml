@@ -1,0 +1,42 @@
+name: Konventionen prüfen
+
+on:
+  pull_request:
+    branches: [dev]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Branch-Name prüfen
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          RE='^feature/[0-9]+-.+'
+          if ! [[ "$BRANCH" =~ $RE ]]; then
+            echo "::error::Branch '$BRANCH' muss so heißen: feature/<Ticketnummer>-<kurzname>"
+            exit 1
+          fi
+          echo "✓ Branch-Name ok: $BRANCH"
+
+      - name: Commit-Messages prüfen
+        env:
+          BASE: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          RE='^#[0-9]+ - .+'
+          FEHLER=0
+          while IFS= read -r msg; do
+            case "$msg" in Merge*|Revert*) continue ;; esac
+            if [[ "$msg" =~ $RE ]]; then
+              echo "✓ $msg"
+            else
+              echo "::error::Ungültige Commit-Message: '$msg' (Format: #<Ticketnummer> - <Beschreibung>)"
+              FEHLER=1
+            fi
+          done < <(git log --format=%s "origin/$BASE..$HEAD_SHA")
+          exit $FEHLER
