@@ -1,0 +1,211 @@
+:root {
+  --cream: #edeec9;
+  --beige: #dde7c7;
+  --tea-green: #bfd8bd;
+  --celadon: #98c9a3;
+  --muted-teal: #77bfa3;
+
+  --text: #23352c;
+  --text-muted: #5a6b62;
+  --surface: #fafbf0;
+  --danger: #b03a3a;
+  --radius: 6px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--cream);
+  color: var(--text);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--text);
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 1rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem;
+}
+
+.container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--tea-green);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+/* forms */
+input,
+select,
+button {
+  font: inherit;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--celadon);
+  border-radius: var(--radius);
+  background: #fff;
+  color: var(--text);
+}
+
+input:focus,
+select:focus,
+button:focus-visible {
+  outline: 2px solid var(--muted-teal);
+  outline-offset: 1px;
+}
+
+/* FormField */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.9rem;
+}
+
+.field label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.field .invalid {
+  border-color: var(--danger);
+}
+
+.field-error {
+  color: var(--danger);
+}
+
+.inline-form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.inline-form .field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* lines a button up with an input that has a label above it */
+.align-input {
+  margin-top: 1.6rem;
+}
+
+/* label / value list */
+.details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+}
+
+.details dt {
+  font-weight: 600;
+}
+
+.details dd {
+  margin: 0;
+}
+
+/* buttons */
+button {
+  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--muted-teal);
+  border-radius: var(--radius);
+  background: var(--muted-teal);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+button:hover {
+  background: var(--celadon);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+button.secondary {
+  background: transparent;
+}
+
+button.secondary:hover {
+  background: var(--beige);
+}
+
+button.danger {
+  background: transparent;
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+button.danger:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+/* tables */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--beige);
+  vertical-align: middle;
+}
+
+th {
+  background: var(--beige);
+  font-weight: 600;
+}
+
+.muted {
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.row-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.row-between h1,
+.row-between h2 {
+  margin: 0;
+}
