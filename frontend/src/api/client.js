@@ -10,6 +10,8 @@ const FALLBACK_MESSAGES = {
   401: 'Not authorized',
   404: 'Not found',
   409: 'Already exists',
+  413: 'File is too large',
+  503: 'Service not available',
 }
 
 // The backend answers errors with a ProblemDetail ({ detail: "..." }); use that text if present.
@@ -24,12 +26,14 @@ async function errorMessage(response) {
 }
 
 async function request(method, path, body) {
+  // FormData (file uploads) is sent as multipart, the browser sets that header itself
+  const isForm = body instanceof FormData
   let response
   try {
     response = await fetch(`/api${path}`, {
       method,
-      headers: body ? { 'Content-Type': 'application/json' } : {},
-      body: body ? JSON.stringify(body) : undefined,
+      headers: body && !isForm ? { 'Content-Type': 'application/json' } : {},
+      body: body && !isForm ? JSON.stringify(body) : body,
     })
   } catch {
     throw new ApiError('Server not reachable', 0)

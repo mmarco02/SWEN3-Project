@@ -1,10 +1,12 @@
 package fh.swen.paperless.service;
 
+import fh.swen.paperless.domain.Document;
 import fh.swen.paperless.domain.User;
 import fh.swen.paperless.exception.InvalidCredentialsException;
 import fh.swen.paperless.exception.NotFoundException;
 import fh.swen.paperless.exception.UsernameTakenException;
 import fh.swen.paperless.persistence.UserRepository;
+import fh.swen.paperless.storage.FileStorage;
 import fh.swen.paperless.util.PasswordHasher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +30,9 @@ class UserServiceTest {
 
     @Mock
     private PasswordHasher passwordHasher;
+
+    @Mock
+    private FileStorage fileStorage;
 
     @InjectMocks
     private UserService userService;         // echter Service, bekommt die Mocks injiziert
@@ -140,6 +145,20 @@ class UserServiceTest {
         userService.delete(1L);
 
         verify(userRepository).delete(user);
+        verifyNoInteractions(fileStorage);
+    }
+
+    @Test
+    void delete_removesFilesOfUsersDocuments() {
+        user.getDocuments().add(Document.builder().id(10L).title("Mit Datei").owner(user).storageKey("key-1").build());
+        user.getDocuments().add(Document.builder().id(11L).title("Ohne Datei").owner(user).build());
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        userService.delete(1L);
+
+        verify(userRepository).delete(user);
+        verify(fileStorage).delete("key-1");
+        verifyNoMoreInteractions(fileStorage);
     }
 
     @Test

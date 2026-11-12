@@ -16,6 +16,7 @@ defineEmits(['delete'])
     <thead>
       <tr>
         <th>Title</th>
+        <th>File</th>
         <th>Tags</th>
         <th>Created</th>
         <th>Updated</th>
@@ -26,7 +27,9 @@ defineEmits(['delete'])
       <tr v-for="doc in documents" :key="doc.id">
         <td>
           <RouterLink :to="{ name: 'document', params: { id: doc.id } }">{{ doc.title }}</RouterLink>
-        </td>        <td>
+        </td>
+        <td class="muted">{{ doc.fileName ?? '–' }}</td>
+        <td>
           <TagChip v-for="tag in doc.tags" :key="tag" :name="tag" />
         </td>
         <td>{{ formatDate(doc.createdAt) }}</td>

@@ -15,7 +15,15 @@ export const usersApi = {
 
 export const documentsApi = {
   getById: (id) => get(`/documents/${id}`),
-  create: (title, ownerId) => post('/documents', { title, ownerId }),
+  create: (title, ownerId, file) => {
+    const form = new FormData()
+    form.append('title', title)
+    form.append('ownerId', ownerId)
+    form.append('file', file)
+    return post('/documents', form)
+  },
+  // used directly as href/src, the browser loads the file itself
+  fileUrl: (id) => `/api/documents/${id}/file`,
   update: (id, title, ownerId) => put(`/documents/${id}`, { title, ownerId }),
   delete: (id) => del(`/documents/${id}`),
   addTag: (id, tagId) => post(`/documents/${id}/tags/${tagId}`),

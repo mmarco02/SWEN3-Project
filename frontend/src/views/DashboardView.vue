@@ -3,15 +3,20 @@ import { onMounted, ref, watch } from 'vue'
 import DocumentTable from '@/components/DocumentTable.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ErrorMessage from '@/components/ErrorMessage.vue'
+import FileField from '@/components/FileField.vue'
 import FormField from '@/components/FormField.vue'
 import { documentsApi, usersApi } from '@/api'
 import { auth } from '@/stores/auth'
-import { rules } from '@/utils/validation'
+import { rules, validateFile } from '@/utils/validation'
 
 const documents = ref([])
 const filter = ref('')
 const newTitle = ref('')
 const titleError = ref('')
+const newFile = ref(null)
+const fileError = ref('')
+const fileField = ref(null)
+const uploading = ref(false)
 const error = ref('')
 const toDelete = ref(null)
 
@@ -31,15 +36,27 @@ watch(filter, () => {
   filterTimeout = setTimeout(load, 300)
 })
 
-async function create() {
+// use the file name as title if none was typed yet
+watch(newFile, (file) => {
+  if (file && !newTitle.value.trim()) newTitle.value = file.name.replace(/\.[^.]+$/, '')
+})
+
+async function upload() {
   titleError.value = rules.documentTitle(newTitle.value)
-  if (titleError.value) return
+  fileError.value = validateFile(newFile.value)
+  if (titleError.value || fileError.value) return
+
+  uploading.value = true
   try {
-    await documentsApi.create(newTitle.value.trim(), auth.user.id)
+    await documentsApi.create(newTitle.value.trim(), auth.user.id, newFile.value)
     newTitle.value = ''
+    fileField.value.reset()
+    error.value = ''
     await load()
   } catch (e) {
     error.value = e.message
+  } finally {
+    uploading.value = false
   }
 }
 
@@ -62,9 +79,11 @@ onMounted(load)
   <ErrorMessage :message="error" />
 
   <section class="card">
-    <form class="inline-form" novalidate @submit.prevent="create">
-      <FormField v-model="newTitle" label="New document" :error="titleError" />
-      <button type="submit" class="align-input">Create</button>
+    <h2>Upload document</h2>
+    <form novalidate @submit.prevent="upload">
+      <FileField ref="fileField" v-model="newFile" label="File (PDF or image)" :error="fileError" />
+      <FormField v-model="newTitle" label="Title" :error="titleError" />
+      <button type="submit" :disabled="uploading">{{ uploading ? 'Uploading…' : 'Upload' }}</button>
     </form>
   </section>
 

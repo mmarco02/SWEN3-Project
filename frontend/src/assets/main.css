@@ -76,7 +76,7 @@ button:focus-visible {
   outline-offset: 1px;
 }
 
-/* FormField */
+/* FormField / FileField */
 .field {
   display: flex;
   flex-direction: column;

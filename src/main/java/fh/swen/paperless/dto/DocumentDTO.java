@@ -15,6 +15,9 @@ import java.util.List;
 public class DocumentDTO {
     private Long id;
     private String title;
+    private String fileName;
+    private String contentType;
+    private Long fileSize;
     private Long ownerId;
     private String ownerUsername;
     private List<String> tags;
