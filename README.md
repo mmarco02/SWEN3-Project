@@ -22,7 +22,7 @@ Geplanter Funktionsumfang:
 ```bash
 docker compose up --build
 ```
-Startet REST-Server (Port 8080), PostgreSQL (Port 5432) und Elasticsearch (Port 9200).
+Startet Frontend (http://localhost, Port 80), REST-Server (Port 8080), PostgreSQL (Port 5432) und Elasticsearch (Port 9200).
 
 Stoppen:
 ```bash
@@ -35,6 +35,19 @@ docker compose down
    docker compose up postgres elasticsearch
    ```
 2. `PaperlessApplication` in `src/main/java/fh/swen/paperless` starten.
+
+## Frontend (Vue.js)
+Liegt in `/frontend` (Vue 3, Vite, Vue Router). Im Docker-Setup liefert nginx das gebaute Frontend aus und leitet `/api` an den REST-Server weiter.
+
+Lokal entwickeln (Node.js 24, Backend läuft auf Port 8080):
+```bash
+cd frontend
+npm install
+npm run dev
+```
+Der Vite-Dev-Server (http://localhost:5173) leitet `/api` an `localhost:8080` weiter.
+
+Seiten: Login, Registrierung, eigene Dokumente (anlegen, filtern, löschen), Dokument-Detail (Titel bearbeiten, Tags zuweisen), Tags verwalten, Account löschen.
 
 # Endpoints
 Die API läuft auf `http://localhost:8080`.
