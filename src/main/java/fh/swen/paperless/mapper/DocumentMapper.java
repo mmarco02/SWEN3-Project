@@ -12,6 +12,9 @@ public class DocumentMapper implements Mapper<Document, DocumentDTO> {
         return DocumentDTO.builder()
                 .id(source.getId())
                 .title(source.getTitle())
+                .fileName(source.getFileName())
+                .contentType(source.getContentType())
+                .fileSize(source.getFileSize())
                 .ownerId(source.getOwner().getId())
                 .ownerUsername(source.getOwner().getUsername())
                 .tags(source.getTags().stream().map(Tag::getName).sorted().toList())
@@ -20,7 +23,8 @@ public class DocumentMapper implements Mapper<Document, DocumentDTO> {
                 .build();
     }
 
-    // owner is resolved by the service, since the DTO only carries its id
+    // owner is resolved by the service, since the DTO only carries its id;
+    // file fields are set on upload only, never from a DTO
     @Override
     public Document mapToSource(DocumentDTO target) {
         return Document.builder()

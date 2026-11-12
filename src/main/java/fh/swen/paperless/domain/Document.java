@@ -24,6 +24,16 @@ public class Document {
     @Column(nullable = false)
     private String title;
 
+    // original file, the content is in MinIO under storageKey
+    private String fileName;
+
+    private String contentType;
+
+    private Long fileSize;
+
+    @Column(unique = true)
+    private String storageKey;
+
     @ManyToOne
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;

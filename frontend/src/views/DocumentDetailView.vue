@@ -3,12 +3,13 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import ErrorMessage from '@/components/ErrorMessage.vue'
+import FilePreview from '@/components/FilePreview.vue'
 import FormField from '@/components/FormField.vue'
 import TagChip from '@/components/TagChip.vue'
 import TagPicker from '@/components/TagPicker.vue'
 import { documentsApi, tagsApi } from '@/api'
 import { auth } from '@/stores/auth'
-import { formatDate } from '@/utils/format'
+import { formatDate, formatSize } from '@/utils/format'
 import { rules } from '@/utils/validation'
 
 const props = defineProps({
@@ -23,6 +24,8 @@ const titleError = ref('')
 const error = ref('')
 const saved = ref(false)
 const confirmOpen = ref(false)
+
+const fileUrl = computed(() => documentsApi.fileUrl(props.id))
 
 // DocumentDTO only carries tag names, but the tag endpoints need ids
 const assignedTags = computed(() => allTags.value.filter((tag) => document.value.tags.includes(tag.name)))
@@ -104,6 +107,20 @@ onMounted(load)
         <dt>Updated</dt>
         <dd>{{ formatDate(document.updatedAt) }}</dd>
       </dl>
+    </section>
+
+    <section v-if="document.fileName" class="card">
+      <div class="row-between">
+        <h2>File</h2>
+        <a :href="fileUrl" target="_blank" rel="noopener">Open</a>
+      </div>
+      <dl class="details">
+        <dt>Name</dt>
+        <dd>{{ document.fileName }}</dd>
+        <dt>Size</dt>
+        <dd>{{ formatSize(document.fileSize) }}</dd>
+      </dl>
+      <FilePreview :url="fileUrl" :content-type="document.contentType" :name="document.fileName" />
     </section>
 
     <section class="card">

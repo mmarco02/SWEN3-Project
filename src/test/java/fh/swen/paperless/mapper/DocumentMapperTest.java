@@ -27,6 +27,10 @@ class DocumentMapperTest {
         Document document = Document.builder()
                 .id(10L)
                 .title("Mietvertrag")
+                .fileName("mietvertrag.pdf")
+                .contentType("application/pdf")
+                .fileSize(1234L)
+                .storageKey("key-1")
                 .owner(owner)
                 .createdAt(created)
                 .updatedAt(updated)
@@ -36,6 +40,9 @@ class DocumentMapperTest {
 
         assertThat(dto.getId()).isEqualTo(10L);
         assertThat(dto.getTitle()).isEqualTo("Mietvertrag");
+        assertThat(dto.getFileName()).isEqualTo("mietvertrag.pdf");
+        assertThat(dto.getContentType()).isEqualTo("application/pdf");
+        assertThat(dto.getFileSize()).isEqualTo(1234L);
         assertThat(dto.getOwnerId()).isEqualTo(1L);
         assertThat(dto.getOwnerUsername()).isEqualTo("mustafa");
         assertThat(dto.getCreatedAt()).isEqualTo(created);

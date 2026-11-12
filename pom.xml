@@ -51,6 +51,17 @@
             <artifactId>spring-security-crypto</artifactId>
         </dependency>
         <dependency>
+            <groupId>io.minio</groupId>
+            <artifactId>minio</artifactId>
+            <version>9.0.4</version>
+        </dependency>
+        <!-- okhttp 5 (used by minio) ships its classes only in okhttp-jvm; Maven doesn't resolve that on its own -->
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp-jvm</artifactId>
+            <version>5.5.1</version>
+        </dependency>
+        <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
