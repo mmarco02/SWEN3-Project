@@ -2,8 +2,10 @@ package fh.swen.paperless.service;
 
 import fh.swen.paperless.domain.Document;
 import fh.swen.paperless.domain.User;
+import fh.swen.paperless.exception.FileStorageException;
 import fh.swen.paperless.exception.InvalidFileException;
 import fh.swen.paperless.exception.NotFoundException;
+import fh.swen.paperless.messaging.DocumentEventPublisher;
 import fh.swen.paperless.persistence.DocumentRepository;
 import fh.swen.paperless.storage.FileStorage;
 import lombok.AllArgsConstructor;
@@ -31,6 +33,7 @@ public class DocumentService {
     private final UserService userService;
     private final TagService tagService;
     private final FileStorage fileStorage;
+    private final DocumentEventPublisher eventPublisher;
 
     public List<Document> fetchAll() {
         return documentRepository.findAll();
@@ -77,12 +80,24 @@ public class DocumentService {
                 .build();
         try {
             Document saved = documentRepository.save(document);
+            // inside the transaction: if the broker is down, the whole upload is rolled back
+            eventPublisher.publishDocumentUploaded(saved);
             log.info("Uploaded document {} ({}) for user {}", saved.getId(), saved.getFileName(), ownerId);
             return saved;
         } catch (RuntimeException e) {
+            log.warn("Upload of '{}' for user {} failed, removing stored file {}", file.getOriginalFilename(), ownerId, storageKey);
             // don't leave an orphaned file in the storage
-            fileStorage.delete(storageKey);
+            deleteStoredFileQuietly(storageKey);
             throw e;
+        }
+    }
+
+    // used while another error is being handled, so a storage error must not replace the original one
+    private void deleteStoredFileQuietly(String storageKey) {
+        try {
+            fileStorage.delete(storageKey);
+        } catch (FileStorageException e) {
+            log.error("Orphaned file {} could not be removed from the storage", storageKey, e);
         }
     }
 
@@ -111,7 +126,9 @@ public class DocumentService {
         if (!document.getOwner().getId().equals(ownerId)) {
             document.setOwner(userService.fetchById(ownerId));
         }
-        return documentRepository.saveAndFlush(document);
+        Document saved = documentRepository.saveAndFlush(document);
+        log.info("Updated document {} (owner {})", id, ownerId);
+        return saved;
     }
 
     @Transactional
@@ -122,6 +139,7 @@ public class DocumentService {
             // if this fails, the transaction rolls back and the document stays
             fileStorage.delete(document.getStorageKey());
         }
+        log.info("Deleted document {} ({})", id, document.getFileName());
     }
 
     public List<Document> fetchByTag(Long tagId) {
