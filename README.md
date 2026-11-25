@@ -9,9 +9,41 @@ Geplanter Funktionsumfang:
 - Jeder User kann im Frontend seine Dokumente ansehen und verwalten
 
 ## Architektur / Technologien
-**Backend:** Java 25, Spring Boot 4, Spring Data JPA, PostgreSQL, MinIO (Datei-Speicher)
+**Backend:** Java 25, Spring Boot 4, Spring Data JPA, PostgreSQL, MinIO (Datei-Speicher), RabbitMQ (Spring AMQP)
+**OCR-Worker:** eigene Spring-Boot-Anwendung in `/ocr-worker`, bekommt die hochgeladenen Dokumente über RabbitMQ
 **Frontend:** Vue.js + nginx
-**Geplant:** RabbitMQ, Elasticsearch, Google Gemini
+**Geplant:** OCR mit Tesseract, Elasticsearch, Google Gemini
+
+## Messaging (RabbitMQ)
+Nach einem erfolgreichen Upload schickt der REST-Server ein Event an RabbitMQ, der OCR-Worker verarbeitet es asynchron:
+
+```
+REST ── document.uploaded ──▶ Exchange paperless.documents (topic) ──▶ Queue paperless.ocr ──▶ OCR-Worker
+                                                                         │ nicht verarbeitbar
+                                                                         ▼
+                                                                     Queue paperless.ocr.dlq
+```
+
+- **Publish/Subscribe:** Der REST-Server kennt nur den Exchange und den Routing-Key, nicht die Empfänger. Jeder Dienst hat seine eigene Queue, weitere Worker (z. B. GenAI) können später ohne Änderung am REST-Server angebunden werden.
+- **Competing Consumers:** Mehrere Instanzen des OCR-Workers teilen sich eine Queue, jede Message wird nur einmal verarbeitet (`docker compose up --scale ocr-worker=3`).
+- **Message:** JSON (`documentId`, `ownerId`, `title`, `fileName`, `contentType`, `fileSize`, `storageKey`, `uploadedAt`), damit der Worker die Datei später direkt aus MinIO laden kann.
+- **Fehler:** Ist RabbitMQ beim Upload nicht erreichbar, wird der Upload zurückgerollt (Datei wird aus MinIO entfernt) und der Client bekommt `503`. Messages, die der Worker nicht verarbeiten kann, landen in der Dead Letter Queue `paperless.ocr.dlq` statt endlos neu zugestellt zu werden.
+- Exchange und Queues werden von REST-Server und Worker gleich deklariert, die Startreihenfolge ist egal. Die Namen sind in beiden `application.properties` unter `paperless.messaging.*` konfiguriert.
+
+In Sprint 3 ist der Worker noch "leer": er loggt die empfangene Message, die OCR folgt in Sprint 4.
+
+## Fehlerbehandlung
+Jede Schicht hat ihre eigenen Exceptions, der `GlobalExceptionHandler` macht daraus `ProblemDetail`-Antworten. Interne Details werden nur geloggt, nie an den Client geschickt.
+
+| Schicht | Exception | HTTP |
+|---|---|---|
+| Controller (Validierung der DTOs) | `MethodArgumentNotValidException`, Feldfehler in `detail` und `errors` | 400 |
+| Business-Layer (Services) | Unterklassen von `ServiceException` (`NotFoundException`, `UsernameTakenException`, `TagNameTakenException`, `InvalidCredentialsException`, `InvalidFileException`) | 404 / 409 / 401 / 400 |
+| Service Agents (MinIO, RabbitMQ) | Unterklassen von `ServiceAgentException` (`FileStorageException`, `MessagePublishException`) | 503 |
+| Data Access Layer | `DataAccessException` von Spring Data | 500 |
+| sonstige Fehler | `Exception` | 500 |
+
+Im OCR-Worker führt eine unvollständige Message zu einer `InvalidMessageException`, die Message wird abgelehnt und in die Dead Letter Queue verschoben.
 
 # Setup
 
@@ -23,7 +55,16 @@ Geplanter Funktionsumfang:
 ```bash
 docker compose up --build
 ```
-Startet Frontend (http://localhost, Port 80), REST-Server (Port 8080), PostgreSQL (Port 5432), Elasticsearch (Port 9200) und MinIO (API Port 9000, Konsole http://localhost:9090, Login `paperless` / `paperless-secret`).
+Startet Frontend (http://localhost, Port 80), REST-Server (Port 8080), OCR-Worker, RabbitMQ (Port 5672, Management-UI http://localhost:15672, Login `paperless` / `paperless-secret`), PostgreSQL (Port 5432), Elasticsearch (Port 9200) und MinIO (API Port 9000, Konsole http://localhost:9090, Login `paperless` / `paperless-secret`).
+
+REST-Server und OCR-Worker starten erst, wenn RabbitMQ bereit ist (Healthcheck).
+
+Prüfen, ob ein Upload beim Worker ankommt (Dokument über http://localhost hochladen):
+```bash
+docker compose logs -f ocr-worker
+# ... Received document.uploaded: document 1 'HelloWorld.pdf' (application/pdf, ...)
+```
+Queues, Messages und die Dead Letter Queue sieht man in der RabbitMQ-UI unter *Queues and Streams*.
 
 Hochgeladene Dateien liegen im MinIO-Bucket `documents` (wird beim ersten Upload angelegt), in der Datenbank wird nur der Verweis darauf gespeichert. Das MinIO-Image kommt von Chainguard (`cgr.dev/chainguard/minio`), weil `minio/minio` nicht mehr auf Docker Hub veröffentlicht wird.
 
@@ -33,11 +74,12 @@ docker compose down
 ```
 
 ## Lokale Entwicklung in IntelliJ
-1. Nur Datenbank, Elasticsearch und MinIO starten:
+1. Nur die Infrastruktur starten:
    ```bash
-   docker compose up postgres elasticsearch minio
+   docker compose up postgres elasticsearch minio rabbitmq
    ```
 2. `PaperlessApplication` in `src/main/java/fh/swen/paperless` starten.
+3. Optional den Worker: `OcrWorkerApplication` in `ocr-worker/src/main/java/fh/swen/paperless/ocr` starten (eigenes Maven-Projekt, in IntelliJ über *Add as Maven Project* auf `ocr-worker/pom.xml` einbinden).
 
 ## Frontend (Vue.js)
 Liegt in `/frontend` (Vue 3, Vite, Vue Router). Im Docker-Setup liefert nginx das gebaute Frontend aus und leitet `/api` an den REST-Server weiter.
@@ -100,7 +142,13 @@ curl -X POST localhost:8080/api/documents/1/tags/1
 ```bash
 ./mvnw test
 ```
-Die Unit-Tests mocken Datenbank und MinIO mit Mockito und brauchen weder PostgreSQL noch MinIO.
+Die Unit-Tests mocken Datenbank, MinIO und RabbitMQ mit Mockito und brauchen keinen der Dienste.
+
+OCR-Worker (eigenes Projekt, startet im Test keinen Listener, braucht also kein RabbitMQ):
+```bash
+cd ocr-worker
+./mvnw test
+```
 
 # Integrationstest
 Folgt in Sprint 6.

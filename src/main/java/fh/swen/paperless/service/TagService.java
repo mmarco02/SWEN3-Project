@@ -6,11 +6,13 @@ import fh.swen.paperless.exception.TagNameTakenException;
 import fh.swen.paperless.persistence.DocumentRepository;
 import fh.swen.paperless.persistence.TagRepository;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class TagService {
@@ -32,7 +34,9 @@ public class TagService {
         if (tagRepository.existsByNameIgnoreCase(name)) {
             throw new TagNameTakenException(name);
         }
-        return tagRepository.save(Tag.builder().name(name).build());
+        Tag saved = tagRepository.save(Tag.builder().name(name).build());
+        log.info("Created tag {} ('{}')", saved.getId(), name);
+        return saved;
     }
 
     @Transactional
@@ -41,5 +45,6 @@ public class TagService {
         // remove the tag from all documents first, otherwise the join table still references it
         documentRepository.findAllByTagsId(id).forEach(document -> document.getTags().remove(tag));
         tagRepository.delete(tag);
+        log.info("Deleted tag {} ('{}')", id, tag.getName());
     }
 }

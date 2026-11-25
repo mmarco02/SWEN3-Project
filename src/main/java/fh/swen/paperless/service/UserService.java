@@ -9,12 +9,14 @@ import fh.swen.paperless.persistence.UserRepository;
 import fh.swen.paperless.storage.FileStorage;
 import fh.swen.paperless.util.PasswordHasher;
 import lombok.AllArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Objects;
 
+@Slf4j
 @Service
 @AllArgsConstructor
 public class UserService {
@@ -46,16 +48,19 @@ public class UserService {
                 .username(username)
                 .passwordHash(passwordHasher.hash(password))
                 .build();
-        return userRepository.save(user);
+        User saved = userRepository.save(user);
+        log.info("Registered user {} ({})", saved.getId(), username);
+        return saved;
     }
 
     public User login(String username, String password) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(InvalidCredentialsException::new);
-
-        if (!passwordHasher.verify(password, user.getPasswordHash())) {
+        User user = userRepository.findByUsername(username).orElse(null);
+        // same exception for unknown user and wrong password, so nobody can probe which usernames exist
+        if (user == null || !passwordHasher.verify(password, user.getPasswordHash())) {
+            log.warn("Failed login for username '{}'", username);
             throw new InvalidCredentialsException();
         }
+        log.info("User {} logged in", user.getId());
         return user;
     }
 
@@ -69,5 +74,6 @@ public class UserService {
                 .toList();
         userRepository.delete(user);
         storageKeys.forEach(fileStorage::delete);
+        log.info("Deleted user {} and {} document file(s)", id, storageKeys.size());
     }
 }

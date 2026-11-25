@@ -4,13 +4,16 @@ import fh.swen.paperless.domain.Document;
 import fh.swen.paperless.domain.User;
 import fh.swen.paperless.exception.FileStorageException;
 import fh.swen.paperless.exception.InvalidFileException;
+import fh.swen.paperless.exception.MessagePublishException;
 import fh.swen.paperless.exception.NotFoundException;
+import fh.swen.paperless.messaging.DocumentEventPublisher;
 import fh.swen.paperless.persistence.DocumentRepository;
 import fh.swen.paperless.storage.FileStorage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,6 +39,9 @@ class DocumentServiceTest {
 
     @Mock
     private FileStorage fileStorage;   // Attrappe statt MinIO
+
+    @Mock
+    private DocumentEventPublisher eventPublisher;   // Attrappe statt RabbitMQ
 
     @InjectMocks
     private DocumentService documentService;
@@ -181,6 +187,50 @@ class DocumentServiceTest {
         ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
         verify(fileStorage).store(key.capture(), any(InputStream.class), anyLong(), anyString());
         verify(fileStorage).delete(key.getValue());
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    void create_publishesUploadedEvent_afterSaving() {
+        when(userService.fetchById(1L)).thenReturn(owner);
+        when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Document result = documentService.create("Mietvertrag", 1L, pdf);
+
+        // erst speichern, dann die Message an den OCR-Worker schicken
+        InOrder inOrder = inOrder(documentRepository, eventPublisher);
+        inOrder.verify(documentRepository).save(any(Document.class));
+        inOrder.verify(eventPublisher).publishDocumentUploaded(result);
+    }
+
+    @Test
+    void create_deletesStoredFileAndRethrows_whenPublishingFails() {
+        when(userService.fetchById(1L)).thenReturn(owner);
+        when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new MessagePublishException("broker down", null))
+                .when(eventPublisher).publishDocumentUploaded(any(Document.class));
+
+        // Exception geht weiter -> Transaktion wird zurückgerollt, Client bekommt 503
+        assertThatThrownBy(() -> documentService.create("Mietvertrag", 1L, pdf))
+                .isInstanceOf(MessagePublishException.class);
+
+        ArgumentCaptor<String> key = ArgumentCaptor.forClass(String.class);
+        verify(fileStorage).store(key.capture(), any(InputStream.class), anyLong(), anyString());
+        verify(fileStorage).delete(key.getValue());
+    }
+
+    @Test
+    void create_keepsOriginalError_whenCleanupOfFileFails() {
+        when(userService.fetchById(1L)).thenReturn(owner);
+        when(documentRepository.save(any(Document.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        doThrow(new MessagePublishException("broker down", null))
+                .when(eventPublisher).publishDocumentUploaded(any(Document.class));
+        doThrow(new FileStorageException("storage down", null)).when(fileStorage).delete(anyString());
+
+        // der ursprüngliche Fehler darf nicht vom Fehler beim Aufräumen verdeckt werden
+        assertThatThrownBy(() -> documentService.create("Mietvertrag", 1L, pdf))
+                .isInstanceOf(MessagePublishException.class)
+                .hasMessage("broker down");
     }
 
     @Test
