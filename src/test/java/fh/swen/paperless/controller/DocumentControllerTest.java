@@ -4,6 +4,7 @@ import fh.swen.paperless.domain.Document;
 import fh.swen.paperless.domain.User;
 import fh.swen.paperless.exception.FileStorageException;
 import fh.swen.paperless.exception.InvalidFileException;
+import fh.swen.paperless.exception.MessagePublishException;
 import fh.swen.paperless.exception.NotFoundException;
 import fh.swen.paperless.mapper.DocumentMapper;
 import fh.swen.paperless.service.DocumentFile;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -110,6 +112,57 @@ class DocumentControllerTest {
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(documentService); // Validierung stoppt vor dem Service
+    }
+
+    @Test
+    void create_returns400WithFieldErrors_whenTitleBlankAndOwnerMissing() throws Exception {
+        mockMvc.perform(multipart("/api/documents")
+                        .file(pdf)
+                        .param("title", ""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(containsString("title")))
+                .andExpect(jsonPath("$.detail").value(containsString("ownerId")))
+                .andExpect(jsonPath("$.errors.title").exists())
+                .andExpect(jsonPath("$.errors.ownerId").exists());
+    }
+
+    @Test
+    void create_returns503_whenMessagingUnavailable() throws Exception {
+        when(documentService.create(eq("Mietvertrag"), eq(1L), any(MultipartFile.class)))
+                .thenThrow(new MessagePublishException("Could not publish document.uploaded", null));
+
+        mockMvc.perform(multipart("/api/documents")
+                        .file(pdf)
+                        .param("title", "Mietvertrag")
+                        .param("ownerId", "1"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.detail").value("Document processing is not available, please try again later"));
+    }
+
+    @Test
+    void getById_returns500WithoutInternals_whenDatabaseFails() throws Exception {
+        when(documentService.fetchById(10L))
+                .thenThrow(new DataAccessResourceFailureException("Connection to postgres:5432 refused"));
+
+        mockMvc.perform(get("/api/documents/10"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.detail").value("Database error"));
+    }
+
+    @Test
+    void getById_returns500_whenUnexpectedErrorOccurs() throws Exception {
+        when(documentService.fetchById(10L)).thenThrow(new IllegalStateException("bug"));
+
+        mockMvc.perform(get("/api/documents/10"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.detail").value("Unexpected server error"));
+    }
+
+    @Test
+    void unsupportedMethod_stillReturns405() throws Exception {
+        // der Fallback-Handler darf Spring-eigene Fehler nicht zu 500 machen
+        mockMvc.perform(delete("/api/documents"))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
