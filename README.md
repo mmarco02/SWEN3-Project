@@ -168,7 +168,7 @@ frontend ──────┘
 
 - **rest** und **ocr-worker**: `./mvnw verify` mit JDK 25 (kompilieren, Unit-Tests, JaCoCo-Coverage, JAR bauen). Die Coverage steht in der Zusammenfassung des Runs, der vollständige JaCoCo-Report liegt als Artefakt (`coverage-rest`, `coverage-ocr-worker`) zum Download bereit.
 - **frontend**: `npm ci` und `npm run build`.
-- **docker**: baut alle Images mit `docker compose build`, wie bei der Abnahme. Läuft nur, wenn die drei anderen Jobs grün sind.
+- **docker**: baut alle Images mit `docker compose build`. Läuft nur, wenn die drei anderen Jobs grün sind.
 
 Die drei ersten Jobs laufen parallel, Maven- und npm-Abhängigkeiten werden zwischen den Läufen gecacht. Ist ein Job rot, zeigt der Pull Request das an, bevor etwas in `dev` oder `master` landet. Die Ergebnisse stehen im Tab *Actions* des Repositories.
 
