@@ -14,6 +14,54 @@ Geplanter Funktionsumfang:
 **Frontend:** Vue.js + nginx
 **Geplant:** OCR mit Tesseract, Elasticsearch, Google Gemini
 
+### Komponenten
+Alle Dienste laufen als eigene Container in `docker-compose.yaml`:
+
+```mermaid
+flowchart LR
+    browser([Browser])
+    subgraph compose[docker compose]
+        frontend["frontend<br/>nginx + Vue<br/>:80"]
+        rest["rest<br/>Spring Boot<br/>:8080"]
+        postgres[("postgres<br/>:5432")]
+        minio[("minio<br/>:9000 / Konsole :9090")]
+        rabbitmq{{"rabbitmq<br/>:5672 / UI :15672"}}
+        ocr["ocr-worker<br/>Spring Boot"]
+        es[("elasticsearch<br/>:9200<br/>noch ungenutzt")]
+    end
+    browser -- HTTP --> frontend
+    frontend -- "/api (Proxy)" --> rest
+    rest -- "Metadaten (JPA)" --> postgres
+    rest -- Dateien --> minio
+    rest -- document.uploaded --> rabbitmq
+    rabbitmq -- "Queue paperless.ocr" --> ocr
+    style es stroke-dasharray: 5 5
+```
+
+### Schichten im REST-Server
+```mermaid
+flowchart TB
+    controller["<b>Controller</b><br/>DocumentController, UserController, TagController<br/>DTOs + Bean Validation"]
+    mapper["<b>Mapper</b> (MapStruct)<br/>Entity ↔ DTO"]
+    service["<b>Services</b> (Business-Layer)<br/>DocumentService, UserService, TagService"]
+    repo["<b>Repositories</b> (Data Access Layer)<br/>Spring Data JPA"]
+    storage["<b>FileStorage</b><br/>MinioFileStorage"]
+    publisher["<b>DocumentEventPublisher</b><br/>RabbitDocumentEventPublisher"]
+    controller --> mapper
+    controller --> service
+    service --> repo
+    service --> storage
+    service --> publisher
+    repo --> db[(PostgreSQL)]
+    storage --> minioStore[(MinIO)]
+    publisher --> mq{{RabbitMQ}}
+```
+
+- **Controller** nehmen DTOs entgegen, validieren sie (`@Valid`) und geben DTOs zurück. Entities verlassen den REST-Server nie.
+- **Services** enthalten die Geschäftslogik und arbeiten mit Entities.
+- **Repositories** kapseln den Datenbankzugriff (Repository Pattern mit Spring Data JPA).
+- **Service Agents** (`FileStorage`, `DocumentEventPublisher`) kapseln die externen Systeme. Die Services kennen nur die Interfaces, die Implementierungen für MinIO und RabbitMQ werden per Dependency Injection eingesetzt.
+
 ## Messaging (RabbitMQ)
 Nach einem erfolgreichen Upload schickt der REST-Server ein Event an RabbitMQ, der OCR-Worker verarbeitet es asynchron:
 
@@ -44,6 +92,25 @@ Jede Schicht hat ihre eigenen Exceptions, der `GlobalExceptionHandler` macht dar
 | sonstige Fehler | `Exception` | 500 |
 
 Im OCR-Worker führt eine unvollständige Message zu einer `InvalidMessageException`, die Message wird abgelehnt und in die Dead Letter Queue verschoben.
+
+## Design-Entscheidungen
+
+| Entscheidung | Begründung |
+|---|---|
+| DTOs statt Entities an der API | Der Passwort-Hash bleibt intern, die Beziehung User ↔ Document führt beim JSON nicht zu einer Endlosschleife, und die API kann sich unabhängig vom Datenbankschema entwickeln. |
+| Mapping mit MapStruct | Der Mapper-Code wird beim Kompilieren generiert (kein Reflection). Mit `unmappedTargetPolicy = ERROR` schlägt der Build fehl, wenn ein neues Feld im Mapping vergessen wird. |
+| Aus DTOs nur explizit erlaubte Felder übernehmen | `@BeanMapping(ignoreByDefault = true)`: Owner, Datei-Felder, Passwort-Hash und Timestamps kann ein Client nie über ein DTO setzen. |
+| Service Agents hinter Interfaces | Die Services hängen nicht direkt von MinIO oder RabbitMQ ab. In Unit-Tests werden die Interfaces gemockt, die Implementierung ist austauschbar. |
+| Dateien in MinIO, in der Datenbank nur der `storageKey` | Die Datenbank bleibt klein, und der Worker kann die Datei über den Key direkt aus MinIO laden, ohne den REST-Server aufzurufen. |
+| Upload wird zurückgerollt, wenn RabbitMQ nicht erreichbar ist | Sonst gäbe es Dokumente, die nie verarbeitet werden. Die Datei wird wieder aus MinIO gelöscht, die Transaktion zurückgerollt, der Client bekommt `503`. |
+| Topic-Exchange mit eigener Queue pro Worker | Der REST-Server kennt nur Exchange und Routing-Key. Weitere Worker (z. B. GenAI) können ohne Änderung am REST-Server angebunden werden. |
+| Dead Letter Queue | Eine Message, die nie verarbeitet werden kann, wird nicht endlos neu zugestellt und blockiert die Queue nicht. Sie bleibt zur Analyse erhalten. |
+| Messages als JSON | Der Worker ist eine eigene Anwendung und braucht keine Klassen aus dem REST-Server. |
+| Exceptions pro Schicht + `GlobalExceptionHandler` | Einheitliche `ProblemDetail`-Antworten mit passendem Statuscode. Technische Details landen nur im Log, nicht beim Client. |
+| Abhängigkeiten werden erst bei Bedarf kontaktiert | Der MinIO-Bucket wird beim ersten Upload angelegt, die Verbindung zu RabbitMQ beim ersten Senden. Der REST-Server startet also auch, wenn diese Dienste noch nicht bereit sind. |
+| Passwörter mit BCrypt | Es wird nur der Hash gespeichert. Beim Login gibt es dieselbe Fehlermeldung für unbekannte User und falsche Passwörter, damit man keine Usernamen ausprobieren kann. |
+| Zusätzlicher Use Case: Tags | Eigene Entity `Tag` mit m:n-Beziehung zu `Document`. Beim Löschen eines Tags wird er zuerst von allen Dokumenten entfernt. |
+| Login ohne Token (bewusste Vereinfachung) | Der Login prüft Username und Passwort und liefert den User zurück, das Frontend merkt sich ihn im `localStorage`. Die API selbst ist dadurch nicht abgesichert, eine Authentifizierung mit Token wäre der nächste Schritt. |
 
 # Setup
 
@@ -150,6 +217,23 @@ cd ocr-worker
 ./mvnw test
 ```
 
+## Teststrategie
+Jede Schicht wird für sich getestet, alles, was außerhalb der Schicht liegt, wird gemockt. So laufen die Tests schnell und ohne laufende Infrastruktur.
+
+| Ebene | Testklassen | Vorgehen |
+|---|---|---|
+| Controller | `DocumentControllerTest`, `UserControllerTest`, `TagControllerTest` | `@WebMvcTest` startet nur die Web-Schicht, die Services sind `@MockitoBean`, die (generierten) Mapper echt. Geprüft werden Statuscodes, JSON, Validierung und Fehlerantworten. |
+| Services | `DocumentServiceTest`, `UserServiceTest`, `TagServiceTest` | Mockito (`@Mock` / `@InjectMocks`) für Repositories, `FileStorage` und `DocumentEventPublisher`. Geprüft werden Geschäftsregeln und Fehlerfälle, z. B. dass ein Upload bei einem RabbitMQ-Ausfall zurückgerollt wird. |
+| Service Agents | `MinioFileStorageTest`, `RabbitDocumentEventPublisherTest` | `MinioClient` bzw. `RabbitTemplate` werden gemockt. Geprüft wird, dass Fehler in `FileStorageException` / `MessagePublishException` übersetzt werden. |
+| Mapper | `DocumentMapperTest`, `UserMapperTest`, `TagMapperTest` | Generierte Mapper über `Mappers.getMapper(...)`, ohne Spring. |
+| Hilfsklassen | `PasswordHasherTest` | Direkt, ohne Mocks. |
+| Anwendung | `PaperlessApplicationTests` | `@SpringBootTest` mit H2 statt PostgreSQL: der Spring-Kontext startet mit allen Beans. |
+| OCR-Worker | `DocumentUploadedListenerTest`, `OcrServiceTest`, `OcrWorkerApplicationTests` | Listener mit gemocktem `OcrService` (ungültige Messages gehen in die Dead Letter Queue). Außerdem wird geprüft, dass die JSON-Message des REST-Servers korrekt gelesen wird. |
+
+**Coverage:** JaCoCo erstellt bei jedem `./mvnw test` einen Report unter `target/site/jacoco/index.html` (bzw. `ocr-worker/target/site/jacoco/index.html`). Stand Ende Sprint 3: REST-Server 112 Tests, ca. 94 % Coverage; OCR-Worker 6 Tests, ca. 98 %.
+
+Die CI führt alle Tests bei jedem Pull Request aus (siehe unten). End-to-End-Tests mit echten Diensten folgen als Integrationstest in Sprint 6.
+
 # CI-Pipeline (GitHub Actions)
 Bei jedem Push und Pull Request auf `dev` oder `master` laufen zwei Workflows:
 
@@ -168,9 +252,44 @@ frontend ──────┘
 
 - **rest** und **ocr-worker**: `./mvnw verify` mit JDK 25 (kompilieren, Unit-Tests, JaCoCo-Coverage, JAR bauen). Die Coverage steht in der Zusammenfassung des Runs, der vollständige JaCoCo-Report liegt als Artefakt (`coverage-rest`, `coverage-ocr-worker`) zum Download bereit.
 - **frontend**: `npm ci` und `npm run build`.
-- **docker**: baut alle Images mit `docker compose build`, wie bei der Abnahme. Läuft nur, wenn die drei anderen Jobs grün sind.
+- **docker**: baut alle Images mit `docker compose build`. Läuft nur, wenn die drei anderen Jobs grün sind.
 
 Die drei ersten Jobs laufen parallel, Maven- und npm-Abhängigkeiten werden zwischen den Läufen gecacht. Ist ein Job rot, zeigt der Pull Request das an, bevor etwas in `dev` oder `master` landet. Die Ergebnisse stehen im Tab *Actions* des Repositories.
+
+# Projektorganisation
+- **Repository:** https://github.com/mmarco02/SWEN3-Project
+- **Issues:** https://github.com/mmarco02/SWEN3-Project/issues (Vorlage „Aufgabe“ mit Sprint, Bereich, Beschreibung und Akzeptanzkriterien)
+- **Pull Requests:** https://github.com/mmarco02/SWEN3-Project/pulls
+
+Ablauf für jede Aufgabe:
+1. Issue anlegen
+2. Branch von `dev` erstellen: `feature/<Issue-Nr>-<kurzname>`
+3. Commits im Format `#<Issue-Nr> - <Beschreibung>`
+4. Pull Request nach `dev` (Vorlage mit `Closes #<Issue-Nr>`). Die CI und der Konventions-Check müssen grün sein.
+5. Am Ende eines Sprints wird `dev` nach `master` gemergt. `master` enthält immer einen stabilen, lauffähigen Stand.
+
+## Projektstruktur
+```
+SWEN3-Project/
+├── src/main/java/fh/swen/paperless/   REST-Server
+│   ├── controller/      REST-Endpoints
+│   ├── dto/             Request- und Response-Objekte
+│   ├── mapper/          MapStruct-Mapper Entity ↔ DTO
+│   ├── service/         Business-Logik
+│   ├── domain/          JPA-Entities (User, Document, Tag)
+│   ├── persistence/     Spring-Data-Repositories
+│   ├── storage/         Service Agent für MinIO
+│   ├── messaging/       Service Agent für RabbitMQ
+│   ├── exception/       Exceptions der Schichten + GlobalExceptionHandler
+│   ├── config/          Konfiguration für MinIO und RabbitMQ
+│   └── util/            PasswordHasher
+├── src/test/            Unit-Tests des REST-Servers
+├── ocr-worker/          OCR-Worker (eigenes Maven-Projekt)
+├── frontend/            Vue-Frontend + nginx-Konfiguration
+├── .github/             CI-Workflows, Issue- und PR-Vorlagen
+├── Dockerfile           Image des REST-Servers
+└── docker-compose.yaml  alle Container
+```
 
 # Integrationstest
 Folgt in Sprint 6.

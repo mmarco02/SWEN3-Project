@@ -120,8 +120,7 @@ jobs:
         run: npm run build
 
   # ---------------------------------------------------------------------------
-  # Job 4: alle Docker-Images bauen, genau wie der Lektor bei der Abnahme
-  # (MUST-HAVE: "No build error (docker compose build)").
+  # Job 4: alle Docker-Images bauen (docker compose build).
   # Startet erst, wenn die drei Jobs oben grün sind.
   # ---------------------------------------------------------------------------
   docker:
