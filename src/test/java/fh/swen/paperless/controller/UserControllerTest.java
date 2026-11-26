@@ -5,8 +5,8 @@ import fh.swen.paperless.domain.User;
 import fh.swen.paperless.exception.InvalidCredentialsException;
 import fh.swen.paperless.exception.NotFoundException;
 import fh.swen.paperless.exception.UsernameTakenException;
-import fh.swen.paperless.mapper.DocumentMapper;
-import fh.swen.paperless.mapper.UserMapper;
+import fh.swen.paperless.mapper.DocumentMapperImpl;
+import fh.swen.paperless.mapper.UserMapperImpl;
 import fh.swen.paperless.service.DocumentService;
 import fh.swen.paperless.service.UserService;
 import org.junit.jupiter.api.Test;
@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(UserController.class)
-@Import({UserMapper.class, DocumentMapper.class})
+@Import({UserMapperImpl.class, DocumentMapperImpl.class})
 class UserControllerTest {
 
     @Autowired

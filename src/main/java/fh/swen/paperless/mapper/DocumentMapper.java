@@ -3,33 +3,32 @@ package fh.swen.paperless.mapper;
 import fh.swen.paperless.domain.Document;
 import fh.swen.paperless.domain.Tag;
 import fh.swen.paperless.dto.DocumentDTO;
-import org.springframework.stereotype.Component;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-public class DocumentMapper implements Mapper<Document, DocumentDTO> {
+import java.util.List;
+import java.util.Set;
+
+@Mapper(config = MapStructConfig.class)
+public interface DocumentMapper extends BaseMapper<Document, DocumentDTO> {
+
+    // the DTO flattens the owner into id + username; tags are converted by mapTagNames below
     @Override
-    public DocumentDTO mapToTarget(Document source) {
-        return DocumentDTO.builder()
-                .id(source.getId())
-                .title(source.getTitle())
-                .fileName(source.getFileName())
-                .contentType(source.getContentType())
-                .fileSize(source.getFileSize())
-                .ownerId(source.getOwner().getId())
-                .ownerUsername(source.getOwner().getUsername())
-                .tags(source.getTags().stream().map(Tag::getName).sorted().toList())
-                .createdAt(source.getCreatedAt())
-                .updatedAt(source.getUpdatedAt())
-                .build();
-    }
+    @Mapping(target = "ownerId", source = "owner.id")
+    @Mapping(target = "ownerUsername", source = "owner.username")
+    DocumentDTO mapToTarget(Document source);
 
     // owner is resolved by the service, since the DTO only carries its id;
     // file fields are set on upload only, never from a DTO
     @Override
-    public Document mapToSource(DocumentDTO target) {
-        return Document.builder()
-                .id(target.getId())
-                .title(target.getTitle())
-                .build();
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "id")
+    @Mapping(target = "title")
+    Document mapToSource(DocumentDTO target);
+
+    // used by MapStruct for Set<Tag> -> List<String>: tag names, sorted so the order is stable
+    default List<String> mapTagNames(Set<Tag> tags) {
+        return tags.stream().map(Tag::getName).sorted().toList();
     }
 }

@@ -3,7 +3,12 @@ package fh.swen.paperless.mapper;
 import java.util.Collection;
 import java.util.List;
 
-public interface Mapper<S, T>{
+/**
+ * Common shape of all mappers between an entity (source) and its DTO (target).
+ * The single-object methods are implemented by MapStruct, the list variants are shared here.
+ */
+public interface BaseMapper<S, T> {
+
     T mapToTarget(S source);
 
     S mapToSource(T target);
