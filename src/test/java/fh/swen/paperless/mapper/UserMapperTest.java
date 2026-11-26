@@ -3,6 +3,7 @@ package fh.swen.paperless.mapper;
 import fh.swen.paperless.domain.User;
 import fh.swen.paperless.dto.UserDTO;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class UserMapperTest {
 
-    private final UserMapper mapper = new UserMapper();
+    private final UserMapper mapper = Mappers.getMapper(UserMapper.class);
 
     @Test
     void mapToTarget_mapsPublicFields() {

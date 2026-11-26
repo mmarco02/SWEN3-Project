@@ -5,8 +5,8 @@ import fh.swen.paperless.domain.Tag;
 import fh.swen.paperless.domain.User;
 import fh.swen.paperless.exception.NotFoundException;
 import fh.swen.paperless.exception.TagNameTakenException;
-import fh.swen.paperless.mapper.DocumentMapper;
-import fh.swen.paperless.mapper.TagMapper;
+import fh.swen.paperless.mapper.DocumentMapperImpl;
+import fh.swen.paperless.mapper.TagMapperImpl;
 import fh.swen.paperless.service.DocumentService;
 import fh.swen.paperless.service.TagService;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TagController.class)
-@Import({TagMapper.class, DocumentMapper.class})
+@Import({TagMapperImpl.class, DocumentMapperImpl.class})
 class TagControllerTest {
 
     @Autowired

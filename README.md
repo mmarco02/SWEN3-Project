@@ -9,7 +9,7 @@ Geplanter Funktionsumfang:
 - Jeder User kann im Frontend seine Dokumente ansehen und verwalten
 
 ## Architektur / Technologien
-**Backend:** Java 25, Spring Boot 4, Spring Data JPA, PostgreSQL, MinIO (Datei-Speicher), RabbitMQ (Spring AMQP)
+**Backend:** Java 25, Spring Boot 4, Spring Data JPA, PostgreSQL, MapStruct (Mapping Entity ↔ DTO), MinIO (Datei-Speicher), RabbitMQ (Spring AMQP)
 **OCR-Worker:** eigene Spring-Boot-Anwendung in `/ocr-worker`, bekommt die hochgeladenen Dokumente über RabbitMQ
 **Frontend:** Vue.js + nginx
 **Geplant:** OCR mit Tesseract, Elasticsearch, Google Gemini

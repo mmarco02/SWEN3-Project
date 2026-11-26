@@ -3,6 +3,7 @@ package fh.swen.paperless.mapper;
 import fh.swen.paperless.domain.Tag;
 import fh.swen.paperless.dto.TagDTO;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TagMapperTest {
 
-    private final TagMapper mapper = new TagMapper();
+    private final TagMapper mapper = Mappers.getMapper(TagMapper.class);
 
     @Test
     void mapToTarget_mapsAllFields() {
