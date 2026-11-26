@@ -150,5 +150,27 @@ cd ocr-worker
 ./mvnw test
 ```
 
+# CI-Pipeline (GitHub Actions)
+Bei jedem Push und Pull Request auf `dev` oder `master` laufen zwei Workflows:
+
+| Workflow | Datei | Prüft |
+|---|---|---|
+| **CI** | `.github/workflows/ci.yml` | Projekt baut und alle Tests sind grün |
+| **Konventionen prüfen** | `.github/workflows/konventionen.yml` | Branch-Name `feature/<nr>-…` und Commit-Messages `#<nr> - …` (nur PRs auf `dev`) |
+
+Die CI besteht aus vier Jobs:
+
+```
+rest ──────────┐
+ocr-worker ────┼──▶ docker (docker compose build)
+frontend ──────┘
+```
+
+- **rest** und **ocr-worker**: `./mvnw verify` mit JDK 25 (kompilieren, Unit-Tests, JaCoCo-Coverage, JAR bauen). Die Coverage steht in der Zusammenfassung des Runs, der vollständige JaCoCo-Report liegt als Artefakt (`coverage-rest`, `coverage-ocr-worker`) zum Download bereit.
+- **frontend**: `npm ci` und `npm run build`.
+- **docker**: baut alle Images mit `docker compose build`, wie bei der Abnahme. Läuft nur, wenn die drei anderen Jobs grün sind.
+
+Die drei ersten Jobs laufen parallel, Maven- und npm-Abhängigkeiten werden zwischen den Läufen gecacht. Ist ein Job rot, zeigt der Pull Request das an, bevor etwas in `dev` oder `master` landet. Die Ergebnisse stehen im Tab *Actions* des Repositories.
+
 # Integrationstest
 Folgt in Sprint 6.
