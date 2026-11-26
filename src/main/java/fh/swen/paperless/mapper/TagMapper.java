@@ -2,24 +2,20 @@ package fh.swen.paperless.mapper;
 
 import fh.swen.paperless.domain.Tag;
 import fh.swen.paperless.dto.TagDTO;
-import org.springframework.stereotype.Component;
+import org.mapstruct.BeanMapping;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
-@Component
-public class TagMapper implements Mapper<Tag, TagDTO> {
-    @Override
-    public TagDTO mapToTarget(Tag source) {
-        return TagDTO.builder()
-                .id(source.getId())
-                .name(source.getName())
-                .createdAt(source.getCreatedAt())
-                .build();
-    }
+@Mapper(config = MapStructConfig.class)
+public interface TagMapper extends BaseMapper<Tag, TagDTO> {
 
     @Override
-    public Tag mapToSource(TagDTO target) {
-        return Tag.builder()
-                .id(target.getId())
-                .name(target.getName())
-                .build();
-    }
+    TagDTO mapToTarget(Tag source);
+
+    // createdAt is set by Hibernate, not by the client
+    @Override
+    @BeanMapping(ignoreByDefault = true)
+    @Mapping(target = "id")
+    @Mapping(target = "name")
+    Tag mapToSource(TagDTO target);
 }

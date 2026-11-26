@@ -1,18 +1,21 @@
 package fh.swen.paperless.mapper;
 
 import fh.swen.paperless.domain.Document;
+import fh.swen.paperless.domain.Tag;
 import fh.swen.paperless.domain.User;
 import fh.swen.paperless.dto.DocumentDTO;
 import org.junit.jupiter.api.Test;
+import org.mapstruct.factory.Mappers;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DocumentMapperTest {
 
-    private final DocumentMapper mapper = new DocumentMapper();
+    private final DocumentMapper mapper = Mappers.getMapper(DocumentMapper.class);
 
     private final User owner = User.builder()
             .id(1L)
@@ -62,6 +65,42 @@ class DocumentMapperTest {
         assertThat(document.getId()).isEqualTo(10L);
         assertThat(document.getTitle()).isEqualTo("Mietvertrag");
         assertThat(document.getOwner()).isNull(); // Owner wird vom Service gesetzt
+    }
+
+    @Test
+    void mapToTarget_mapsTagsToSortedNames() {
+        Document document = Document.builder()
+                .id(10L)
+                .title("Mietvertrag")
+                .owner(owner)
+                .tags(Set.of(Tag.builder().id(2L).name("Vertrag").build(),
+                        Tag.builder().id(1L).name("Rechnung").build()))
+                .build();
+
+        DocumentDTO dto = mapper.mapToTarget(document);
+
+        assertThat(dto.getTags()).containsExactly("Rechnung", "Vertrag");
+    }
+
+    @Test
+    void mapToSource_ignoresFileFieldsFromClient() {
+        DocumentDTO dto = DocumentDTO.builder()
+                .id(10L)
+                .title("Mietvertrag")
+                .fileName("fremde-datei.pdf")
+                .contentType("application/pdf")
+                .fileSize(999L)
+                .tags(List.of("Rechnung"))
+                .build();
+
+        Document document = mapper.mapToSource(dto);
+
+        // Datei-Felder werden nur beim Upload gesetzt, nie aus einem DTO
+        assertThat(document.getFileName()).isNull();
+        assertThat(document.getContentType()).isNull();
+        assertThat(document.getFileSize()).isNull();
+        assertThat(document.getStorageKey()).isNull();
+        assertThat(document.getTags()).isEmpty();
     }
 
     @Test

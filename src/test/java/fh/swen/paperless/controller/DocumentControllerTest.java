@@ -6,7 +6,7 @@ import fh.swen.paperless.exception.FileStorageException;
 import fh.swen.paperless.exception.InvalidFileException;
 import fh.swen.paperless.exception.MessagePublishException;
 import fh.swen.paperless.exception.NotFoundException;
-import fh.swen.paperless.mapper.DocumentMapper;
+import fh.swen.paperless.mapper.DocumentMapperImpl;
 import fh.swen.paperless.service.DocumentFile;
 import fh.swen.paperless.service.DocumentService;
 import org.junit.jupiter.api.Test;
@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(DocumentController.class)
-@Import(DocumentMapper.class)   // echter Mapper, wird damit gleich mitgetestet
+@Import(DocumentMapperImpl.class)   // echter (von MapStruct generierter) Mapper, wird damit gleich mitgetestet
 class DocumentControllerTest {
 
     @Autowired
