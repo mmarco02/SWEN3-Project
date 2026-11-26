@@ -1,0 +1,136 @@
+# CI-Pipeline: prüft bei jedem Push und Pull Request, ob alle Teile des Projekts
+# noch bauen und alle Tests grün sind. Läuft parallel zum Konventions-Check (konventionen.yml).
+name: CI
+
+on:
+  push:
+    branches: [dev, master]
+  pull_request:
+    branches: [dev, master]
+  # erlaubt, die Pipeline auch per Knopfdruck im Actions-Tab zu starten
+  workflow_dispatch:
+
+# ein neuer Push auf denselben Branch bricht den alten, noch laufenden Durchlauf ab
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# die Pipeline liest nur den Code, sie darf nichts im Repository ändern
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: REST-Server bauen, Unit-Tests ausführen, Coverage messen
+  # ---------------------------------------------------------------------------
+  rest:
+    name: REST-Server (Build + Tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v5
+
+      - name: JDK 25 installieren
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          # lädt die Maven-Abhängigkeiten nicht bei jedem Lauf neu herunter
+          cache: maven
+          cache-dependency-path: pom.xml
+
+      # verify = kompilieren + Unit-Tests + JaCoCo-Report + JAR bauen.
+      # Schlägt ein Test fehl, bricht der Job hier ab und der PR bekommt ein rotes X.
+      - name: Bauen und testen
+        run: ./mvnw -B verify
+
+      - name: Coverage in die Zusammenfassung schreiben
+        if: always()
+        run: .github/scripts/coverage-summary.sh "REST-Server" target/site/jacoco/jacoco.csv
+
+      - name: Coverage-Report hochladen
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-rest
+          path: target/site/jacoco/
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Job 2: OCR-Worker (eigenes Maven-Projekt im Unterordner ocr-worker)
+  # ---------------------------------------------------------------------------
+  ocr-worker:
+    name: OCR-Worker (Build + Tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ocr-worker
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v5
+
+      - name: JDK 25 installieren
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: ocr-worker/pom.xml
+
+      - name: Bauen und testen
+        run: ./mvnw -B verify
+
+      - name: Coverage in die Zusammenfassung schreiben
+        if: always()
+        run: ../.github/scripts/coverage-summary.sh "OCR-Worker" target/site/jacoco/jacoco.csv
+
+      - name: Coverage-Report hochladen
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: coverage-ocr-worker
+          path: ocr-worker/target/site/jacoco/
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  # Job 3: Frontend bauen (Vue + Vite)
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend (Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v5
+
+      - name: Node.js 24 installieren
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # npm ci installiert exakt die Versionen aus package-lock.json
+      - name: Abhängigkeiten installieren
+        run: npm ci
+
+      - name: Bauen
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Job 4: alle Docker-Images bauen, genau wie der Lektor bei der Abnahme
+  # (MUST-HAVE: "No build error (docker compose build)").
+  # Startet erst, wenn die drei Jobs oben grün sind.
+  # ---------------------------------------------------------------------------
+  docker:
+    name: Docker Images (docker compose build)
+    runs-on: ubuntu-latest
+    needs: [rest, ocr-worker, frontend]
+    steps:
+      - name: Code auschecken
+        uses: actions/checkout@v5
+
+      - name: Alle Images bauen
+        run: docker compose build
